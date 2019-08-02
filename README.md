@@ -14,9 +14,9 @@ Updated at 2019-08-02
 
 ## Installation 下载链接
 ### Windows Version
-直接运行ASFbot.exe「[Windows版](https://github.com/rakuyo42/ASF-Telegram-Bot)」  
+直接运行ASFbot.exe「[Windows版](https://github.com/rakuyo42/ASF-Telegram-Bot/releases/download/v0.9.1/ASFbot.exe)」  
 ### Linux Version
-`chmod 775 ASFbot`给予运行权限后`./ASFbot`执行「[Linux版](https://github.com/rakuyo42/ASF-Telegram-Bot)」  
+`chmod 775 ASFbot`给予运行权限后`./ASFbot`执行「[Linux版](https://github.com/rakuyo42/ASF-Telegram-Bot/releases/download/v0.9.1/ASFbot)」  
 （也可以用win10的Powershell运行）
 
 ## Quick start
