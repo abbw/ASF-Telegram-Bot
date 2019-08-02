@@ -1,3 +1,3 @@
 set GOARCH=amd64
 set GOOS=linux
-go build -o ASFTGbot
+go build -o ASFbot
