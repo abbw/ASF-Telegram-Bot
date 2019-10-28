@@ -19,7 +19,7 @@ Updated at 2019-10-28
 `chmod 775 ASFbot`给予运行权限后`./ASFbot`执行「[Linux版](https://github.com/rakuyo42/ASF-Telegram-Bot/releases/download/v0.9.3/asf_tg_bot)」  
 （也可以用win10的Powershell运行）
 ### QQ机器人
-[酷Q插件.cpk](https://github.com/rakuyo42/CoolQ-cpks/raw/master/cpks/ink.ews.steamhelper.cpk)
+[酷Q插件.cpk](https://github.com/rakuyo42/ASF-Telegram-Bot/releases/download/v0.9.3/ink.ews.steamhelper.cpk)
 
 ## Quick start
 首次启动，生成配置文件后按照控制台提示修改配置  
