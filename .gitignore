@@ -16,5 +16,5 @@ config.json
 config.example.json
 
 # Build
-ASFbot
-ASFbot.exe
+asf_tg_bot
+ASF_Tg_Bot.exe

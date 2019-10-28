@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -31,7 +32,7 @@ func main() {
 	if applyConfig("config.json") {
 		fmt.Println("读取配置文件成功!")
 	} else {
-		fmt.Println("初始化配置文件成功!")
+		fmt.Println("已初始化配置文件!")
 	}
 	if CONFIG.BotToken == "" {
 		fmt.Print("请输入bot token: ")
@@ -48,28 +49,32 @@ func startBot() {
 		panic(err)
 	} else {
 		saveConfig()
-		fmt.Println("连接到机器人成功!")
-		fmt.Printf("已获得机器人 [%s] 的控制权!\n", bot.Self.UserName)
+		fmt.Println("成功连接到机器人!")
+		fmt.Printf("已获得机器人 [%s](@%s) 的控制权!\n", bot.Self.FirstName, bot.Self.UserName)
 	}
 	TempVerification := getRandString(10)
 	if CONFIG.ChatID == 0 {
 		var master_chat_id int64
-		fmt.Println("请输入你的Telegram账号的Chat id: (直接使用Telegram设置请输入0)")
+		fmt.Println("开始设置机器人归属的Telegram账号...")
+		fmt.Println("请输入你的Telegram账号的Chat id: (跳过请直接回车)")
+		fmt.Println("(跳过后可直接与机器人对话设置或者编辑配置文件config.json来设置)")
 		fmt.Scanln(&master_chat_id)
 		if master_chat_id > 0 {
 			CONFIG.ChatID = master_chat_id
 			saveConfig()
 		} else {
-			fmt.Printf("请尽快私聊机器人 %s 以验证你的telegram账号!\n", TempVerification)
+			fmt.Printf("请尽快私聊机器人[%s](@%s)消息 %s 以验证你的telegram账号!\n", bot.Self.FirstName, bot.Self.UserName, TempVerification)
 		}
 	}
 	var isASFReady bool
 	var nextSet bool
 	fmt.Println("开始测试ASF-IPC连接的畅通性...")
-	if testIPC() {
+	if test_ASF_IPC() {
+		fmt.Printf("ASF-IPC正在正常工作!\n")
 		isASFReady = true
 	} else {
 		fmt.Printf("测试ASF-IPC连接未通过，请检查配置是否正确!\n")
+		fmt.Printf("编辑config.json或与机器人对话来重新配置!\n")
 		isASFReady = false
 	}
 	fmt.Println("======================================================")
@@ -79,7 +84,7 @@ func startBot() {
 	u.Timeout = 60
 	updates, err := bot.GetUpdatesChan(u)
 
-	fmt.Printf("%s 正在辛勤工作中...\n", bot.Self.UserName)
+	fmt.Printf("%s(https://t.me/%s) 正在辛勤工作中...\n", bot.Self.FirstName, bot.Self.UserName)
 	for update := range updates {
 		if update.Message == nil { // ignore any non-Message Updates
 			continue
@@ -93,21 +98,22 @@ func startBot() {
 				if update.Message.Text != TempVerification {
 					reply = "验证码错误！\n请重新输入："
 				} else {
-					reply = "验证成功！\n已设置 " + update.Message.Chat.UserName + "(" +
-						strconv.FormatInt(update.Message.Chat.ID, 10) + ") 为机器人主人！"
-					CONFIG.ChatID = update.Message.Chat.ID
+					master := update.Message.Chat
+					reply = "验证成功！\n已确认 " + master.FirstName + " " + master.LastName + "(@" +
+						master.UserName + " " + strconv.FormatInt(master.ID, 10) + ") 为机器人所有者！"
+					CONFIG.ChatID = master.ID
 					saveConfig()
 				}
 			} else {
-				reply = "还未设置机器人主人！\n请输入服务端生成的临时验证码："
+				reply = "还未设置机器人归属！\n请输入服务端生成的临时验证码："
 			}
 		} else if update.Message.Chat.ID != CONFIG.ChatID {
 			speakName := update.Message.Chat.FirstName
 			if update.Message.Chat.LastName != "" {
 				speakName += " " + update.Message.Chat.LastName
 			}
-			reply = speakName + "，你没有此bot的控制权。\n你的Username：" + update.Message.Chat.UserName +
-				"\n你的Chat ID：" + strconv.FormatInt(update.Message.Chat.ID, 10)
+			reply = speakName + "，你没有此bot的控制权。\n你的Username: @" + update.Message.Chat.UserName +
+				"\n你的Chat ID: " + strconv.FormatInt(update.Message.Chat.ID, 10)
 		} else if !isASFReady && !nextSet {
 			reply = "ASF尚未准备好，请重新配置。\n请输入ASF-IPC的URL及密码(用空格隔开)："
 			nextSet = true
@@ -116,7 +122,7 @@ func startBot() {
 			if len(ipc_config) > 1 {
 				CONFIG.IPCUrl = ipc_config[0]
 				CONFIG.IPCPassword = ipc_config[1]
-				if testIPC() {
+				if test_ASF_IPC() {
 					saveConfig()
 					reply = "测试通过！可以正常使用机器人。"
 					isASFReady = true
@@ -149,11 +155,11 @@ func startBot() {
 func printLog(keyword string) {
 	if keyword == "beginning" {
 		fmt.Println("======================================================")
-		fmt.Println("Rakuyo的ASF-Telegram机器人 Version 0.9.1")
-		fmt.Println("更新于2019年8月2日")
+		fmt.Println("Rakuyo的ASF-Telegram机器人 Version 0.9.3")
+		fmt.Println("最后更新于2019年10月28日")
 		fmt.Println("源码    https://github.com/rakuyo42/ASF-Telegram-Bot")
 		fmt.Println("示例    https://t.me/RakuyoASFBot")
-		fmt.Println("有任何疑问请到  https://steamcn.com/t503337-1-1  反馈")
+		fmt.Println("有任何疑问请到  https://keylol.com/t503337-1-1  反馈")
 		fmt.Println("======================================================")
 	} else if keyword == "startbot" {
 		fmt.Println("======================================================")
@@ -165,14 +171,13 @@ func printLog(keyword string) {
 		fmt.Println("    <Panic> Post https://api.telegram.org/bot......")
 		fmt.Println("            则为「连接Telegram服务器失败」")
 		fmt.Println("                请自行解决「网络问题」")
-		fmt.Println("                  (比如换成国外vps)")
+		fmt.Println("           (比如把本程序换到国外vps上运行)")
 		fmt.Println()
 		fmt.Println(">>>>>>>>>>>>          少女折寿中          <<<<<<<<<<<<")
 	}
 }
 
-func queryASF(query string) string {
-	/* 构造URL */
+func gen_API_URL(query string, api string) string {
 	url := CONFIG.IPCUrl
 	if !strings.HasPrefix(url, "http") {
 		url = "http://" + url
@@ -180,41 +185,65 @@ func queryASF(query string) string {
 	if !strings.HasSuffix(url, "/") {
 		url += "/"
 	}
-	url += "Api/Command/" + query
+	if api == "asf" {
+		url += "Api/ASF/" + query
+	} else if api == "bot" {
+		url += "Api/Bot/" + query
+	} else if api == "command" {
+		url += "Api/Command/"
+	}
+	return url
+}
 
+func json_to_string(resp_body []byte, resp_status string) string {
+	resp_msg := resp_status
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(resp_body), &result); err == nil && resp_status == "200 OK" {
+		resp_msg = result["Result"].(string)
+	}
+	return resp_msg
+}
+
+func queryASF(command string) string {
 	/* 构造请求 */
-	req, _ := http.NewRequest("POST", url, nil)
-
+	req_method := "POST"
+	req_url := gen_API_URL(command, "command")
+	req_body := bytes.NewBuffer([]byte("{\"Command\": \"" + command + "\"}"))
+	fmt.Printf("即将携带json %s 访问 %s\n", req_body, req_url)
+	req, _ := http.NewRequest(req_method, req_url, req_body)
+	req.Header.Set("Content-Type", "application/json")
 	/* 添加身份认证请求头 */
 	if CONFIG.IPCPassword != "" {
 		req.Header.Set("Authentication", CONFIG.IPCPassword)
 	}
-
-	/* 发送请求并获取响应 */
+	/* 发送请求并解析响应 */
 	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
+	if resp, err := client.Do(req); err != nil {
 		fmt.Println(err)
-		return "0xF1"
+		return "0xF2"
+	} else {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return json_to_string(body, resp.Status)
 	}
-
-	/* 解析响应 */
-	body, _ := ioutil.ReadAll(resp.Body)
-	var result map[string]interface{}
-	var queryResult string = resp.Status
-	if err := json.Unmarshal([]byte(body), &result); err == nil {
-		if queryResult == "200 OK" {
-			queryResult = result["Result"].(string)
-		}
-	}
-	return queryResult
 }
 
-func testIPC() bool {
+func test_ASF_IPC() bool {
 	fmt.Println("======================================================")
 	fmt.Printf("尝试连接预设的 ASF-IPC(%s) ...\n", CONFIG.IPCUrl)
-	ret := queryASF("version")
-	if strings.Contains(ret, "ASF") {
+	req, _ := http.NewRequest("GET", gen_API_URL("", "asf"), nil)
+	if CONFIG.IPCPassword != "" {
+		req.Header.Set("Authentication", CONFIG.IPCPassword)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	var ret string
+	if err != nil {
+		fmt.Println(err)
+		ret = "0xF1"
+	} else {
+		ret = resp.Status
+	}
+	if strings.HasPrefix(ret, "200") {
 		fmt.Printf("连接到 ASF-IPC(%s) 成功!\n", CONFIG.IPCUrl)
 		return true
 	} else if strings.HasPrefix(ret, "0xF1") {
@@ -232,7 +261,6 @@ func testIPC() bool {
 	} else {
 		fmt.Printf("未知错误! 连接 ASF-IPC(%s) 失败!\n")
 	}
-	fmt.Println()
 	return false
 }
 
