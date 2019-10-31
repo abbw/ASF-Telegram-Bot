@@ -32,7 +32,7 @@ Updated at 2019-10-31
 先退出，直接编辑同目录下的config.json配置文件再重新启动 
 
 ## config.json配置项
-```json
+```
 {
     "tg_bot_token": "你的机器人token",
     "tg_chat_id": 你的Telegram账号的chatid(注意此项没有用引号括起来，此项应该是一串不带引号的纯数字),
