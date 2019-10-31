@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"golang.org/x/net/proxy"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -12,10 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-)
-
-import (
-	"github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 func main() {
@@ -39,11 +37,11 @@ func main() {
 		fmt.Scanf("%s", &CONFIG.BotToken)
 	}
 	printLog("startbot")
-	startBot()
+	startBot(getProxyClient())
 }
 
-func startBot() {
-	bot, err := tgbotapi.NewBotAPI(CONFIG.BotToken)
+func startBot(client *http.Client) {
+	bot, err := tgbotapi.NewBotAPIWithClient(CONFIG.BotToken, client)
 	if err != nil {
 		fmt.Println("连接到机器人失败!")
 		panic(err)
@@ -79,7 +77,11 @@ func startBot() {
 	}
 	fmt.Println("======================================================")
 
-	bot.Debug = true
+	if CONFIG.DebugBot {
+		bot.Debug = true
+	} else {
+		bot.Debug = false
+	}
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates, err := bot.GetUpdatesChan(u)
@@ -145,7 +147,7 @@ func startBot() {
 			}
 			reply = queryASF(query_str)
 		}
-
+		fmt.Printf("[%s]: %s\n", bot.Self.FirstName, reply)
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, reply)
 		msg.ReplyToMessageID = update.Message.MessageID
 		bot.Send(msg)
@@ -155,8 +157,8 @@ func startBot() {
 func printLog(keyword string) {
 	if keyword == "beginning" {
 		fmt.Println("======================================================")
-		fmt.Println("Rakuyo的ASF-Telegram机器人 Version 0.9.3")
-		fmt.Println("最后更新于2019年10月28日")
+		fmt.Println("Rakuyo的ASF-Telegram机器人 Version 0.9.4")
+		fmt.Println("最后更新于2019年10月31日")
 		fmt.Println("源码    https://github.com/rakuyo42/ASF-Telegram-Bot")
 		fmt.Println("示例    https://t.me/RakuyoASFBot")
 		fmt.Println("有任何疑问请到  https://keylol.com/t503337-1-1  反馈")
@@ -171,7 +173,8 @@ func printLog(keyword string) {
 		fmt.Println("    <Panic> Post https://api.telegram.org/bot......")
 		fmt.Println("            则为「连接Telegram服务器失败」")
 		fmt.Println("                请自行解决「网络问题」")
-		fmt.Println("           (比如把本程序换到国外vps上运行)")
+		fmt.Println("  (比如编辑配置文件config.json设置http或者socket代理)")
+		fmt.Println("    (最便捷&一劳永逸的方法是在国外vps上运行本程序)")
 		fmt.Println()
 		fmt.Println(">>>>>>>>>>>>          少女折寿中          <<<<<<<<<<<<")
 	}
@@ -209,7 +212,7 @@ func queryASF(command string) string {
 	req_method := "POST"
 	req_url := gen_API_URL(command, "command")
 	req_body := bytes.NewBuffer([]byte("{\"Command\": \"" + command + "\"}"))
-	fmt.Printf("即将携带json %s 访问 %s\n", req_body, req_url)
+	fmt.Printf("携带json %s 访问 %s\n", req_body, req_url)
 	req, _ := http.NewRequest(req_method, req_url, req_body)
 	req.Header.Set("Content-Type", "application/json")
 	/* 添加身份认证请求头 */
@@ -262,6 +265,43 @@ func test_ASF_IPC() bool {
 		fmt.Printf("未知错误! 连接 ASF-IPC(%s) 失败!\n")
 	}
 	return false
+}
+
+func getProxyClient() *http.Client {
+	var proxy_url string
+	if CONFIG.SocketProxy != "" {
+		proxy_url = strings.ToLower(CONFIG.SocketProxy)
+		if len(proxy_url) < 6 {
+			proxy_url = "127.0.0.1:" + proxy_url
+		}
+		dialer, err := proxy.SOCKS5("tcp", proxy_url, nil, proxy.Direct)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "can't connect to the proxy:", err)
+			os.Exit(1)
+		}
+		httpTransport := &http.Transport{}
+		httpClientWithProxy := &http.Client{Transport: httpTransport}
+		httpTransport.Dial = dialer.Dial
+		fmt.Printf("已设置Socket代理，优先使用socket，尝试使用Socket5代理%s\n", proxy_url)
+		return httpClientWithProxy
+	}
+	if CONFIG.HTTPProxy != "" {
+		proxy_url = strings.ToLower(CONFIG.HTTPProxy)
+		if strings.HasPrefix(proxy_url, "https://") {
+			os.Setenv("HTTPS_PROXY", proxy_url)
+		} else {
+			if len(proxy_url) < 6 {
+				proxy_url = "http://127.0.0.1:" + proxy_url
+			} else if !strings.HasPrefix(proxy_url, "http://") {
+				proxy_url = "http://" + proxy_url
+			}
+			os.Setenv("HTTP_PROXY", proxy_url)
+		}
+		fmt.Printf("已设置HTTP代理，尝试使用HTTP代理%s\n", proxy_url)
+	} else {
+		fmt.Printf("没有设置代理，尝试直连https://api.telegram.org/\n")
+	}
+	return &http.Client{}
 }
 
 func getFile(file_name string) (string, error) {
@@ -355,4 +395,7 @@ type ConfigStruct struct {
 	ChatID      int64  `json:"tg_chat_id"`
 	IPCUrl      string `json:"asf_ipc_url"`
 	IPCPassword string `json:"asf_ipc_password"`
+	SocketProxy string `json:"socket_proxy"`
+	HTTPProxy   string `json:"http(s)_proxy"`
+	DebugBot    bool   `json:"bot_debug"`
 }
